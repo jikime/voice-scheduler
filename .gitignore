@@ -2,5 +2,7 @@
 node_modules
 .env
 .env.local
-*.json
+token.json
+credentials.json
 __pycache__
+yarn.lock
