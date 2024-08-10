@@ -102,8 +102,6 @@ export default function VoiceChat() {
   const finalTranscriptRef = useRef('');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isStoppingRef = useRef(false);
-  const endTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -115,7 +113,6 @@ export default function VoiceChat() {
 
   const stopRecognition = useCallback(() => {
     console.log('음성 인식 중지 시도');
-    isStoppingRef.current = true;
 
     if (recognitionRef.current) {
       try {
@@ -125,33 +122,23 @@ export default function VoiceChat() {
       }
     }
 
-    // 상태 업데이트 및 정리 작업
     setIsListening(false);
+
+    const finalText = finalTranscriptRef.current.trim();
+    if (finalText) {
+      handleSubmit(finalText);
+    }
+
     setTranscript('');
     finalTranscriptRef.current = '';
 
     console.log('음성 인식 중지 및 정리 완료');
   }, []);
 
-  const resetTimer = useCallback(
-    (isStart: boolean = false) => {
-      if (endTimeoutRef.current) {
-        clearTimeout(endTimeoutRef.current);
-      }
-      if (!isStart) {
-        endTimeoutRef.current = setTimeout(() => {
-          stopRecognition();
-          console.log('음성 인식이 일정 시간 동안 입력이 없어 중지되었습니다.');
-        }, 5000); // 5초로 증가
-      }
-    },
-    [stopRecognition]
-  );
-
   const playTextToSpeech = useCallback(
     async (text: string) => {
       try {
-        console.log('Sending request to text-to-speech API');
+        console.log('text-to-speech API에 요청을 보내는중...');
         const response = await fetch('http://localhost:8000/text-to-speech', {
           method: 'POST',
           headers: {
@@ -163,23 +150,18 @@ export default function VoiceChat() {
           }),
         });
 
-        console.log('Received response:', response);
-
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`텍스트를 음성으로 변환하는 데 실패했습니다. 서버 응답: ${errorText}`);
         }
 
         const data = await response.json();
-        console.log('Received data:', data);
 
-        // 텍스트 처리
         setMessages((prevMessages) => [
           ...prevMessages,
           { id: Date.now(), text: data.text, isUser: false },
         ]);
 
-        // 음성 처리
         const audioBlob = new Blob([Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0))], {
           type: 'audio/mpeg',
         });
@@ -197,6 +179,7 @@ export default function VoiceChat() {
             (error instanceof Error ? error.message : String(error))
         );
       }
+      console.log('API 요청 완료');
     },
     [setError, setMessages]
   );
@@ -209,22 +192,16 @@ export default function VoiceChat() {
         setMessages((prevMessages) => [...prevMessages, newUserMessage]);
         setInputText('');
 
-        // 즉시 API 호출 (지연 없음)
-        // playTextToSpeech(text.trim()).catch((error) => {
-        //   console.error('TTS 재생 중 오류:', error);
-        //   setError(
-        //     '음성을 재생하는 데 실패했습니다: ' +
-        //       (error instanceof Error ? error.message : String(error))
-        //   );
-        // });
-
-        // 음성 인식 중지를 딜레이와 함께 실행
-        setTimeout(() => {
-          stopRecognition();
-        }, 1000); // 1초 딜레이
+        playTextToSpeech(text.trim()).catch((error) => {
+          console.error('TTS 재생 중 오류:', error);
+          setError(
+            '음성을 재생하는 데 실패했습니다: ' +
+              (error instanceof Error ? error.message : String(error))
+          );
+        });
       }
     },
-    [playTextToSpeech, setError, stopRecognition]
+    [playTextToSpeech, setError]
   );
 
   useEffect(() => {
@@ -240,46 +217,25 @@ export default function VoiceChat() {
         setIsListening(true);
         setError(null);
         finalTranscriptRef.current = '';
-        isStoppingRef.current = false;
-        resetTimer(true); // true를 전달하여 시작 시에는 타이머를 설정하지 않음
       };
 
       recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-        if (isStoppingRef.current) return;
-
         console.log('음성 인식 결과:', event.results);
         let interimTranscript = '';
-        let finalTranscript = '';
+        let isFinal = false;
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript;
+            finalTranscriptRef.current += event.results[i][0].transcript;
+            isFinal = true;
           } else {
-            interimTranscript += transcript;
+            interimTranscript += event.results[i][0].transcript;
           }
         }
 
-        if (finalTranscript) {
-          console.log('최종 트랜스크립트:', finalTranscript);
-          finalTranscriptRef.current += finalTranscript;
-          setTranscript(finalTranscriptRef.current);
-
-          // 최종 결과가 있을 때 타이머 재설정
-          resetTimer();
-
-          // 최종 결과가 있고, 일정 길이 이상일 때 딜레이 후 제출
-          if (finalTranscriptRef.current.length >= 2) {
-            setTimeout(() => {
-              handleSubmit(finalTranscriptRef.current);
-              finalTranscriptRef.current = ''; // 최종 트랜스크립트 초기화
-            }, 5000); // 1초 딜레이
-          }
-        } else {
-          const currentTranscript = finalTranscriptRef.current + interimTranscript;
-          console.log('현재 트랜스크립트:', currentTranscript);
-          setTranscript(currentTranscript);
-        }
+        const currentTranscript = finalTranscriptRef.current + interimTranscript;
+        console.log('현재 트랜스크립트:', currentTranscript);
+        setTranscript(currentTranscript);
       };
 
       recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -304,7 +260,6 @@ export default function VoiceChat() {
         setIsListening(false);
         setTranscript('');
         finalTranscriptRef.current = '';
-        isStoppingRef.current = false;
       };
     } else {
       console.error('이 브라우저는 음성 인식을 지원하지 않습니다.');
@@ -313,12 +268,9 @@ export default function VoiceChat() {
     }
 
     return () => {
-      if (endTimeoutRef.current) {
-        clearTimeout(endTimeoutRef.current);
-      }
-      // stopRecognition();
+      stopRecognition();
     };
-  }, [handleSubmit, stopRecognition, resetTimer]);
+  }, [stopRecognition]);
 
   const toggleListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -331,7 +283,6 @@ export default function VoiceChat() {
         finalTranscriptRef.current = '';
         try {
           recognitionRef.current.start();
-          // resetTimer 호출 제거
         } catch (error) {
           console.error('음성 인식 시작 오류:', error);
           setError(
@@ -377,7 +328,7 @@ export default function VoiceChat() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <p>
                   {isSupportedBrowser
-                    ? '음성으로 말씀해주세요. 마이크 아이콘을 클릭하여 시작하세요.'
+                    ? '마이크 아이콘을 클릭하여 음성을 시작 또는 중지하세요.'
                     : '이 브라우저에서는 음성 인식이 지원되지 않습니다. 텍스트로 메시지를 입력해주세요.'}
                 </p>
               </div>
@@ -421,7 +372,7 @@ export default function VoiceChat() {
                         onClick={toggleListening}
                       >
                         <Mic className="size-4" />
-                        <span className="sr-only">마이크 사용</span>
+                        <span className="sr-only">마이크 {isListening ? '끄기' : '켜기'}</span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
