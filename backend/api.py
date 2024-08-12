@@ -5,8 +5,9 @@ from pydantic import BaseModel
 from gtts import gTTS
 import io
 import logging
-from utils.process import calendar_process
+from libs.process import calendar_process
 import base64
+from libs.graph import run_workflow
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,7 +35,9 @@ async def text_to_speech(request: TextToSpeechRequest, req: Request):
     logger.info(f"Request body: {request}")
 
     try:
-        processed_text = calendar_process(request.text)
+        # processed_text = calendar_process(request.text)
+        processed_text = run_workflow(request.text)
+
         print("Processed text:", processed_text)
 
         tts = gTTS(text=processed_text, lang=request.lang, slow=False)

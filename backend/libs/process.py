@@ -1,6 +1,6 @@
 import os
-from utils.llm import response_from_llm
-from utils.prompt import (
+from libs.llm import response_from_llm
+from libs.prompt import (
     system_task_prompt,
     user_task_prompt,
     system_event_prompt,
@@ -8,36 +8,17 @@ from utils.prompt import (
     system_calendar_date_prompt,
     user_calendar_date_prompt,
     system_date_format_prompt,
-    user_date_format_prompt
+    user_date_format_prompt,
 )
-from utils.calendar import GoogleCalendar
-from utils.util import load_json
+from libs.calendar import GoogleCalendar
+from libs.util import load_json, format_events
 from datetime import datetime
+
 
 google_calendar = GoogleCalendar(
     calendar_id=os.getenv("GOOGLE_CALENDAR_ID"),
-    google_calendar_api_key=os.getenv("GOOGLE_CALENDAR_API_KEY"),
     dir_token="./",
 )
-
-
-def format_events(events):
-    formatted_events = []
-    for event in events:
-        start = event["start"].get("dateTime", event["start"].get("date"))
-        end = event["end"].get("dateTime", event["end"].get("date"))
-
-        start_dt = datetime.fromisoformat(start)
-
-        date = start_dt.strftime("%Y-%m-%d")
-        time = start_dt.strftime("%H:%M")
-        title = event.get("summary", "(제목 없음)")
-        location = event.get("location", "(장소 없음)")
-
-        formatted_event = f"날짜: {date}, 시간: {time}, 제목: {title}, 장소: {location}"
-        formatted_events.append(formatted_event)
-
-    return formatted_events
 
 
 def calendar_process(event):
@@ -55,8 +36,8 @@ def calendar_process(event):
         print("오늘 또는 특정일의 일정을 가져오는 기능을 수행합니다.")
 
         if category == "today":
-            today_str = datetime.today().strftime('%Y-%m-%d')
-        else: # category == "specific"
+            today_str = datetime.today().strftime("%Y-%m-%d")
+        else:  # category == "specific"
             today_str = response_from_llm(
                 event, system_date_format_prompt, user_date_format_prompt
             )
