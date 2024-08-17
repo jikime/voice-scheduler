@@ -8,6 +8,8 @@ import logging
 from libs.process import calendar_process
 import base64
 from libs.graph import run_workflow
+from typing import Literal
+from libs.llm import generate_speech_openai
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +28,15 @@ app.add_middleware(
 class TextToSpeechRequest(BaseModel):
     text: str
     lang: str = "ko"
+    tts_engine: Literal["gtts", "openai"] = "gtts"
+
+
+def generate_speech_gtts(text: str, lang: str) -> bytes:
+    tts = gTTS(text=text, lang=lang, slow=False)
+    audio_content = io.BytesIO()
+    tts.write_to_fp(audio_content)
+    audio_content.seek(0)
+    return audio_content.getvalue()
 
 
 @app.post("/text-to-speech")
@@ -38,15 +49,16 @@ async def text_to_speech(request: TextToSpeechRequest, req: Request):
         # processed_text = calendar_process(request.text)
         processed_text = run_workflow(request.text)
 
-        print("Processed text:", processed_text)
+        logger.info(f"Processed text: {processed_text}")
 
-        tts = gTTS(text=processed_text, lang=request.lang, slow=False)
+        if request.tts_engine == "gtts":
+            audio_content = generate_speech_gtts(processed_text, request.lang)
+        elif request.tts_engine == "openai":
+            audio_content = generate_speech_openai(processed_text)
+        else:
+            raise ValueError("Invalid TTS engine specified")
 
-        audio_content = io.BytesIO()
-        tts.write_to_fp(audio_content)
-        audio_content.seek(0)
-
-        audio_base64 = base64.b64encode(audio_content.getvalue()).decode("utf-8")
+        audio_base64 = base64.b64encode(audio_content).decode("utf-8")
 
         response_data = {"text": processed_text, "audio": audio_base64}
 

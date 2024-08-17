@@ -147,6 +147,7 @@ export default function VoiceChat() {
           body: JSON.stringify({
             text,
             lang: 'ko',
+            tts_engine: 'openai' // openai, gtts
           }),
         });
 

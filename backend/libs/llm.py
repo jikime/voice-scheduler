@@ -18,4 +18,11 @@ def response_from_llm(event: str, system: str, user: str) -> str:
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
-        raise RuntimeError(f"Error in LLM response: {e}")
+        raise RuntimeError(f"Error in LLM Chat response: {e}")
+
+def generate_speech_openai(text: str) -> bytes:
+    try:
+      response = client.audio.speech.create(model="tts-1", voice="alloy", input=text)
+      return response.content
+    except Exception as e:
+      raise RuntimeError(f"Error in LLM Speach response: {e}")

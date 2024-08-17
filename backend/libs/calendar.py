@@ -16,6 +16,7 @@ class GoogleCalendar:
         self.token_path = os.path.join(dir_token, "token.json")
         self.cred_path = os.path.join(dir_token, "credentials.json")
         self.calendar_id = calendar_id
+        self.make_token_from_credentials()
         self.service = self.get_authenticated_service()
 
     def make_token_from_credentials(self):

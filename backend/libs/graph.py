@@ -35,11 +35,12 @@ class State(TypedDict):
 def classify_task(state: State) -> State:
     try:
         task = response_from_llm(state["input"], system_task_prompt, user_task_prompt)
+        print("task==>", task)
         if task not in ["today", "specific", "add"]:
-            raise ValueError(f"Invalid task classification: {task}")
+            return {"error": "요청에 해당하는 분류가 없습니다. 다시 시도해주세요."}
         return {"task": task}
     except Exception as e:
-        return {"error": f"Error in task classification: {str(e)}"}
+        return {"error": f"뷴류 처리중 오류가 발생하였습니다.: {str(e)}"}
 
 
 def process_date(state: State) -> State:
@@ -56,9 +57,9 @@ def process_date(state: State) -> State:
             return {"date": date}
         return {"date": ""}  # 빈 문자열 반환하여 키는 항상 존재하도록 함
     except ValueError as e:
-        return {"error": f"Invalid date format: {str(e)}"}
+        return {"error": f"날짜 포맷이 올바르지 않습니다.: {str(e)}"}
     except Exception as e:
-        return {"error": f"Error processing date: {str(e)}"}
+        return {"error": f"날짜 포맷 처리중 오류가 발생하였습니다.: {str(e)}"}
 
 
 def get_events(state: State) -> State:
@@ -68,7 +69,7 @@ def get_events(state: State) -> State:
         formatted_events = format_events(events["items"])
         return {"events": formatted_events}
     except Exception as e:
-        return {"error": f"Error fetching events: {str(e)}", "events": []}
+        return {"error": f"일정을 가져오는중 오류가 발생하였습니다.: {str(e)}", "events": []}
 
 
 def add_event(state: State) -> State:
@@ -81,9 +82,9 @@ def add_event(state: State) -> State:
         print("event_data==>", event_data)
         return {"output": "일정이 성공적으로 추가되었습니다."}
     except ValueError as e:
-        return {"error": f"Error parsing event data: {str(e)}"}
+        return {"error": f"일정 데이타를 파싱하는데 오류가 발생하였습니다.: {str(e)}"}
     except Exception as e:
-        return {"error": f"Error adding event: {str(e)}"}
+        return {"error": f"일정 추가중 오류가 발생하였습니다.: {str(e)}"}
 
 
 def format_response(state: State) -> State:
@@ -125,6 +126,7 @@ workflow.add_conditional_edges(
         "today": "process_date",
         "specific": "process_date",
         "add": "add_event",
+        "format_response": "format_response"
     },
 )
 workflow.add_conditional_edges(
