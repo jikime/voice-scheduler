@@ -22,7 +22,8 @@ def response_from_llm(event: str, system: str, user: str) -> str:
 
 def generate_speech_openai(text: str) -> bytes:
     try:
-      response = client.audio.speech.create(model="tts-1", voice="alloy", input=text)
+      # alloy, echo, fable, onyx, nova, and shimmer
+      response = client.audio.speech.create(model="tts-1", voice="nova", input=text)
       return response.content
     except Exception as e:
       raise RuntimeError(f"Error in LLM Speach response: {e}")
